@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KaamSetu — Voice-First Hyper-Local Jobs</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { color: #38bdf8; margin-bottom: 0.25rem; }
+    .subtitle { color: #94a3b8; margin-bottom: 1.5rem; }
+    .card { background: #1e293b; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; border: 1px solid #334155; }
+    button { background: #0284c7; color: white; border: none; padding: 0.85rem 1.4rem; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button:hover { background: #0369a1; }
+    select, input { padding: 0.65rem; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; margin-right: 0.5rem; }
+    .badge { background: #0ea5e9; color: #0f172a; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+    .job-item { border-left: 4px solid #38bdf8; padding-left: 1rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>KaamSetu (कामसेतु)</h1>
+  <p class="subtitle">Speak your skill and area — hear nearby daily-wage jobs instantly.</p>
+
+  <div class="card">
+    <h3>1. Voice Search (Web Speech API)</h3>
+    <button id="speakBtn" onclick="startVoice()">🎤 Speak Skill & Area</button>
+    <p id="transcriptText" style="color:#38bdf8; margin-top:0.75rem;">Try saying: "I am an electrician in Yelahanka"</p>
+  </div>
+
+  <div class="card">
+    <h3>2. Tap-to-Pick Fallback (Dialect Error Mitigation)</h3>
+    <select id="skillSelect">
+      <option value="electrician">Electrician</option>
+      <option value="plumber">Plumber</option>
+      <option value="mason">Mason</option>
+    </select>
+    <select id="areaSelect">
+      <option value="yelahanka">Yelahanka</option>
+      <option value="hebbal">Hebbal</option>
+      <option value="peenya">Peenya</option>
+    </select>
+    <button onclick="runFallback()">Find Nearest Jobs</button>
+  </div>
+
+  <div id="results" class="card" style="display:none;"></div>
+
+  <script>
+    async function queryMatches(transcript) {
+      document.getElementById('transcriptText').innerText = 'Heard: "' + transcript + '"';
+      const res = await fetch('/api/v1/voice/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript })
+      });
+      const data = await res.json();
+      renderMatches(data);
+    }
+
+    function renderMatches(data) {
+      const box = document.getElementById('results');
+      box.style.display = 'block';
+      let html = `<h3>Top ${data.matches.length} Jobs for <span class="badge">${data.extractedSkill.toUpperCase()}</span> near <span class="badge">${data.extractedArea.toUpperCase()}</span></h3>`;
+      data.matches.forEach((m, idx) => {
+        html += `<div class="job-item">
+          <strong>#${idx + 1} ${m.title}</strong> — ₹${m.wagePerDayInr}/day (${m.distanceKm} km away)<br/>
+          <small>Area: ${m.areaName} | Employer: ${m.employerName} (${m.employerPhone})</small>
+        </div>`;
+      });
+      box.innerHTML = html;
+
+      // Browser SpeechSynthesis fallback until ElevenLabs S3 audio is wired
+      if ('speechSynthesis' in window && data.matches.length > 0) {
+        const utter = new SpeechSynthesisUtterance("Top match: " + data.matches[0].spokenSummary);
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    function startVoice() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Speech API unavailable in this browser. Use the Tap-to-Pick fallback below.');
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.onresult = (event) => queryMatches(event.results[0][0].transcript);
+      recognition.start();
+    }
+
+    function runFallback() {
+      const skill = document.getElementById('skillSelect').value;
+      const area = document.getElementById('areaSelect').value;
+      queryMatches(`${skill} in ${area}`);
+    }
+  </script>
+</body>
+</html>

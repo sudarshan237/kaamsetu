@@ -1,4 +1,4 @@
-# kaamsetu# KaamSetu
+# KaamSetu
 Voice-first, hyper-local job matching for informal workers (wHACKiest 2026, Track 4: UnlockED).
 
 ## Problem
